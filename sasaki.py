@@ -25,25 +25,50 @@ class SimProcess(multiprocessing.Process):
         self.r_connection = r_connection
         self.id_ = id_
         self.num_process = -1
-        num = randint(0, 10*num_process)
+        num = randint(0, 10**4)
+        self.area = 0
+        self.rmarker = False
+        self.lmarker = False
         self.value = num
+        if l_connection is None:
+            self.lvalue = None
+            self.area = self.area - 1
+            self.rmarker = True
+        else:
+            self.lvalue = num
+        if r_connection is None:
+            self.rvalue = None
+            self.lmarker = True
+        else:
+            self.rvalue = num
         self.round = 0
         self.init_flag = init_flag
 
     def reply_message(self, message):
         """Handle Reply type messages."""
-        self.value = message.value
+        if message.identifier == 'R':
+            self.rvalue = message.value
+            self.rmarker = message.marker
+        else:
+            self.lvalue = message.value
+            self.lmarker = message.marker
 
     def action_message(self, message):
         """Handle Action type messages."""
-        if message.value > self.value and message.from_id < self.id_:
-            new_message = Message(self.value, self.id_, message.from_id, self.round, "Reply")
-            self.value = message.value
-            print("-> <- Swapping between P{} and P{}\n".format(self.id_, message.from_id) if verbose else "", end='')
+        if message.identifier == 'R':
+            if message.value > self.lvalue:
+                if message.marker:
+                    self.area -= 1
+                if self.lmarker:
+                    self.area += 1
+                self.lvalue = message.value
+                self.lmarker = message.marker
+                print("-> <- Updating value at P{}\n".format(self.id_) if verbose else "", end='')
         else:
-            new_message = Message(message.value, self.id_, message.from_id, self.round, "Reply")
-
-        self.l_connection.send(new_message)
+            if message.value < self.rvalue:
+                self.rvalue = message.value
+                self.rmarker = message.marker
+                print("-> <- Updating value at P{}\n".format(self.id_) if verbose else "", end='')
 
     def service_message(self, message):
         """Handle Service type messages."""
@@ -60,8 +85,8 @@ class SimProcess(multiprocessing.Process):
             message.from_id = self.id_
             message.value += 1
             if self.r_connection is not None:
-                print(".. P{} send message to P{}\n".format(self.id_, next_process) if verbose else "", end='')
                 self.r_connection.send(message)
+                print(".. P{} send message to P{}\n".format(self.id_, next_process) if verbose else "", end='')
             else:
                 self.num_process = message.value
                 message.to_id = self.id_ - 1
@@ -113,29 +138,59 @@ class SimProcess(multiprocessing.Process):
         self.init_process_count()
         print("P{} Num process = {}\n".format(self.id_, self.num_process) if verbose else "", end='')
 
-        print("P{} Value = {} at round {}".format(self.id_, self.value, self.round))
         next_ = self.id_ + 1 if self.id_ < self.num_process-1 else -1
+        if self.num_process <= 10:
+            x = 2
+        else:
+            x = 5
         for i in range(0, self.num_process):
             self.round = i
-            print("** P{}: Current Value={} Current round={}\n".format(self.id_, self.value, self.round) if verbose else "", end='')
-            if self.id_ % 2 == i % 2:
-                if next_ != -1:
-                    self.r_connection.send(Message(self.value, self.id_, next_,
-                                           i, "Action"))
-                    print(" .. P{} sent message to right process P{}\n".format(self.id_, next_) if verbose else "", end='')
-                    self.receive("R")
+            if i == 0:
+                if self.l_connection is not None:
+                    print(".. P{} sent data on left socket.\n".format(self.id_) if verbose else "", end='')
+                    self.l_connection.send(Message(self.lvalue, self.id_, next_, i, "Action", 'L', self.lmarker))
+                if self.r_connection is not None:
+                    print(".. P{} sent data on right socket.\n".format(self.id_) if verbose else "", end='')
+                    self.r_connection.send(Message(self.rvalue, self.id_, next_, i, "Action", 'R', self.rmarker))
             else:
-                self.receive("L")
+                if self.l_connection is not None:
+                    print(".. P{} waiting for message on left socket.\n".format(self.id_) if verbose else "", end='')
+                    self.receive("L")
+                if self.r_connection is not None:
+                    print(".. P{} waiting for message on right socket.\n".format(self.id_) if verbose else "", end='')
+                    self.receive("R")
+                if self.lvalue is not None and self.rvalue is not None:
+                    print(".. P{} Swapping lval and rval\n".format(self.id_) if verbose else "", end='')
+                    if self.lvalue > self.rvalue:
+                        tmp = self.lvalue
+                        self.lvalue = self.rvalue
+                        self.rvalue = tmp
+                        tmp = self.lmarker
+                        self.lmarker = self.rmarker
+                        self.rmarker = tmp
+                if self.l_connection is not None:
+                    print(".. P{} sent data on left socket.\n".format(self.id_) if verbose else "", end='')
+                    self.l_connection.send(Message(self.lvalue, self.id_, next_, i, "Action", 'L', self.lmarker))
+                if self.r_connection is not None:
+                    print(".. P{} sent data on right socket.\n".format(self.id_) if verbose else "", end='')
+                    self.r_connection.send(Message(self.rvalue, self.id_, next_, i, "Action", 'R', self.rmarker))
+            #if i % x == 0:
+            #    print("Snapshot@ P{} for R{}: {}{}|{}{}({})\n".format(self.id_, self.round, self.lvalue, ' U' if self.lmarker else '', self.rvalue, ' U' if self.rmarker else '', self.area), end="")
 
-        print("P{} Value = {} at round {}".format(self.id_, self.value, self.round))
+        if self.area == -1:
+            self.value = self.rvalue
+        else:
+            self.value = self.lvalue
+        #print("P{} Value = {}".format(self.id_, self.value, self.round))
 
 
 class Message():
     """Message class."""
 
-    def __init__(self, value, from_id, to_id, round_, type_, marker=False):
+    def __init__(self, value, from_id, to_id, round_, type_, identifier=None, marker=False):
         """Init."""
         self.value = value
+        self.identifier = identifier
         self.marker = marker
         self.from_id = from_id
         self.to_id = to_id
