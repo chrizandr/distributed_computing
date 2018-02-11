@@ -1,4 +1,4 @@
-"""N minus 2 distrbuted sorting implementation."""
+"""Sasaki's time optimal distrbuted sorting implementation."""
 import multiprocessing
 from multiprocessing import Pipe
 from random import randint
@@ -17,8 +17,8 @@ verbose = False
 class SimProcess(multiprocessing.Process):
     """Simulation of a Processor."""
 
-    def __init__(self, id_, l_connection=None, r_connection=None, init_flag=False):
-        """Init."""
+    def __init__(self, id_, operator, l_connection=None, r_connection=None, init_flag=False):
+        """Initializes a process by assigning appropriate values to  it."""
         multiprocessing.Process.__init__(self)
         assert id_ >= 0
         self.l_connection = l_connection
@@ -43,9 +43,17 @@ class SimProcess(multiprocessing.Process):
             self.rvalue = num
         self.round = 0
         self.init_flag = init_flag
+        self.operator = operator
+
+    def compare(self, val1, val2):
+        """Returns appropriate value based on the operator given through command line arguments."""
+        if self.operator == '>':
+            return val1 > val2
+        else:
+            return val2 > val1
 
     def reply_message(self, message):
-        """Handle Reply type messages."""
+        """Handle Reply type messages. The sender reads reply messages sent by the receiver."""
         if message.identifier == 'R':
             self.rvalue = message.value
             self.rmarker = message.marker
@@ -54,9 +62,9 @@ class SimProcess(multiprocessing.Process):
             self.lmarker = message.marker
 
     def action_message(self, message):
-        """Handle Action type messages."""
+        """Handle Action type messages. Receiver does local computation on receiving data."""
         if message.identifier == 'R':
-            if message.value > self.lvalue:
+            if self.compare(self.lvalue, message.value):
                 if message.marker:
                     self.area -= 1
                 if self.lmarker:
@@ -65,13 +73,13 @@ class SimProcess(multiprocessing.Process):
                 self.lmarker = message.marker
                 print("-> <- Updating value at P{}\n".format(self.id_) if verbose else "", end='')
         else:
-            if message.value < self.rvalue:
+            if self.compare(message.value, self.rvalue):
                 self.rvalue = message.value
                 self.rmarker = message.marker
                 print("-> <- Updating value at P{}\n".format(self.id_) if verbose else "", end='')
 
     def service_message(self, message):
-        """Handle Service type messages."""
+        """Handle Service type messages. These messages are to calculate the number of processes."""
         next_process = self.id_+1 if message.from_id < self.id_ else self.id_-1
         if message.marker:
             self.num_process = message.value
@@ -95,7 +103,7 @@ class SimProcess(multiprocessing.Process):
                 self.l_connection.send(message)
 
     def handle(self, message):
-        """Message service."""
+        """Appropriate message service is called based on the type of the message received. """
         if message.type == "Service":
             self.service_message(message)
 
@@ -108,7 +116,7 @@ class SimProcess(multiprocessing.Process):
             self.reply_message(message)
 
     def receive(self, flag):
-        """Receive wait."""
+        """Process waits for messages from the sender."""
         assert flag in ["L", "R"]
         message = None
         if flag is "L":
@@ -134,7 +142,7 @@ class SimProcess(multiprocessing.Process):
             self.receive("R")
 
     def run(self):
-        """Sorting logic."""
+        """Calls appropriate actions during the whole process of sorting."""
         self.init_process_count()
         print("P{} Num process = {}\n".format(self.id_, self.num_process) if verbose else "", end='')
 
@@ -161,7 +169,7 @@ class SimProcess(multiprocessing.Process):
                     self.receive("R")
                 if self.lvalue is not None and self.rvalue is not None:
                     print(".. P{} Swapping lval and rval\n".format(self.id_) if verbose else "", end='')
-                    if self.lvalue > self.rvalue:
+                    if self.compare(self.rvalue, self.lvalue):
                         tmp = self.lvalue
                         self.lvalue = self.rvalue
                         self.rvalue = tmp
@@ -174,21 +182,21 @@ class SimProcess(multiprocessing.Process):
                 if self.r_connection is not None:
                     print(".. P{} sent data on right socket.\n".format(self.id_) if verbose else "", end='')
                     self.r_connection.send(Message(self.rvalue, self.id_, next_, i, "Action", 'R', self.rmarker))
-            #if i % x == 0:
-            #    print("Snapshot@ P{} for R{}: {}{}|{}{}({})\n".format(self.id_, self.round, self.lvalue, ' U' if self.lmarker else '', self.rvalue, ' U' if self.rmarker else '', self.area), end="")
+            if i % x == 0:
+                print("Snapshot@ P{} for R{}: {}{}|{}{}({})\n".format(self.id_, self.round, self.lvalue, ' U' if self.lmarker else '', self.rvalue, ' U' if self.rmarker else '', self.area), end="")
 
         if self.area == -1:
             self.value = self.rvalue
         else:
             self.value = self.lvalue
-        #print("P{} Value = {}".format(self.id_, self.value, self.round))
+        print("P{} Value = {}".format(self.id_, self.value, self.round))
 
 
 class Message():
     """Message class."""
 
     def __init__(self, value, from_id, to_id, round_, type_, identifier=None, marker=False):
-        """Init."""
+        """Initialize each message based on the parameters passed."""
         self.value = value
         self.identifier = identifier
         self.marker = marker
@@ -202,12 +210,17 @@ if __name__ == '__main__':
     if len(sys.argv) > 1:
         num_process = int(sys.argv[1])
         try:
-            verbose = bool(sys.argv[2])
+            operator = '>' if sys.argv[2] == "dsc" else '<'
+        except IndexError:
+            operator = '<'
+        try:
+            verbose = bool(sys.argv[3])
         except IndexError:
             pass
     else:
-        print("Usage: python plain_dist_sort.py <num_process> [verbose]\n" +
+        print("Usage: python <filename>.py <num_process> <order> [verbose]\n" +
               "num_process : Number of processes to simulate.\n" +
+              "order: 'asc' will return ascending order of elements and 'dsc' will return descending order of elements.\n" +
               "verbose : True/False to print the log of the Simulator\n")
         sys.exit(0)
 
@@ -217,11 +230,11 @@ if __name__ == '__main__':
     connections = [Pipe(duplex=True) for i in range(num_process-1)]
 
     # Created processes in a line network
-    left_process = SimProcess(0, None, connections[0][0], init_flag=True)
+    left_process = SimProcess(0, operator, None, connections[0][0], init_flag=True, )
     processes.append(left_process)
-    processes.extend([SimProcess(i, connections[i-1][1], connections[i][0])
+    processes.extend([SimProcess(i, operator, connections[i-1][1], connections[i][0])
                       for i in range(1, num_process - 1)])
-    right_process = SimProcess(num_process-1, connections[num_process-2][1], None)
+    right_process = SimProcess(num_process-1, operator, connections[num_process-2][1], None)
     processes.append(right_process)
 
     # Start all processes.

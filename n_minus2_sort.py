@@ -1,4 +1,4 @@
-"""N minus 2 distrbuted sorting implementation."""
+"""Faster N minus 1 distrbuted sorting implementation."""
 import multiprocessing
 from multiprocessing import Pipe
 from random import randint
@@ -17,7 +17,7 @@ verbose = False
 class SimProcess(multiprocessing.Process):
     """Simulation of a Processor."""
 
-    def __init__(self, id_, l_connection=None, r_connection=None, init_flag=False):
+    def __init__(self, id_, operator, l_connection=None, r_connection=None, init_flag=False):
         """Init."""
         multiprocessing.Process.__init__(self)
         assert id_ >= 0
@@ -25,22 +25,30 @@ class SimProcess(multiprocessing.Process):
         self.r_connection = r_connection
         self.id_ = id_
         self.num_process = -1
-        num = randint(0, 10*num_process)
+        num = randint(0, 10**4)
         self.value = num
         self.round = 0
         self.init_flag = init_flag
+        self.operator = operator
+
+    def compare(self, val1, val2):
+        """Returns appropriate value based on the operator given through command line arguments."""
+        if self.operator == '>':
+            return val1 > val2
+        else:
+            return val2 > val1
 
     def reply_message(self, message):
-        """Handle Reply type messages."""
+        """Handle Reply type messages. The sender reads reply messages sent by the receiver."""
         self.value = message.value
 
     def action_message(self, message):
-        """Handle Action type messages."""
-        if message.value < self.value and message.from_id > self.id_:
+        """Handle Action type messages. Receiver does local computation on receiving data."""
+        if self.compare(message.value, self.value) and message.from_id > self.id_:
             new_message = Message(self.value, self.id_, message.from_id, self.round, "Reply")
             self.value = message.value
             print("-> <- Swapping between P{} and P{}\n".format(self.id_, message.from_id) if verbose else "", end='')
-        elif message.value > self.value and message.from_id < self.id_:
+        elif self.compare(self.value, message.value) and message.from_id < self.id_:
             new_message = Message(self.value, self.id_, message.from_id, self.round, "Reply")
             self.value = message.value
             print("-> <- Swapping between P{} and P{}\n".format(self.id_, message.from_id) if verbose else "", end='')
@@ -53,7 +61,7 @@ class SimProcess(multiprocessing.Process):
             self.r_connection.send(new_message)
 
     def service_message(self, message):
-        """Handle Service type messages."""
+        """Handle Service type messages. These messages are to calculate the number of processes."""
         next_process = self.id_+1 if message.from_id < self.id_ else self.id_-1
         if message.marker:
             self.num_process = message.value
@@ -77,7 +85,7 @@ class SimProcess(multiprocessing.Process):
                 self.l_connection.send(message)
 
     def handle(self, message):
-        """Message service."""
+        """Appropriate message service is called based on the type of the message received."""
         if message.type == "Service":
             self.service_message(message)
 
@@ -90,7 +98,7 @@ class SimProcess(multiprocessing.Process):
             self.reply_message(message)
 
     def receive(self, flag):
-        """Receive wait."""
+        """Process waits for messages from the sender."""
         assert flag in ["L", "R"]
         message = None
         if flag is "L":
@@ -116,14 +124,17 @@ class SimProcess(multiprocessing.Process):
             self.receive("R")
 
     def run(self):
-        """Sorting logic."""
+        """Calls appropriate actions during the whole process of sorting."""
         self.init_process_count()
         print("P{} Num process = {}\n".format(self.id_, self.num_process) if verbose else "", end='')
 
-        print("P{} Value = {} at round {}".format(self.id_, self.value, self.round))
         next_ = self.id_ + 1 if self.id_ < self.num_process-1 else -1
         prev_ = self.id_ - 1 if self.id_ > 0 else -1
-        for i in range(0, self.num_process-2):
+        if self.num_process <= 10:
+            x = 2
+        else:
+            x = 5
+        for i in range(0, self.num_process-1):
             self.round = i
             print("** P{}: Current Value={} Current round={}\n".format(self.id_, self.value, self.round) if verbose else "", end='')
             if self.id_ % 2 == i % 2:
@@ -141,6 +152,8 @@ class SimProcess(multiprocessing.Process):
             else:
                 self.receive("L")
                 self.receive("R")
+            if i % x == 0:
+                print("Snapshot@ P{} for R{}: {}\n".format(self.id_, self.round, self.value), end="")
 
         print("P{} Value = {} at round {}".format(self.id_, self.value, self.round))
 
@@ -149,7 +162,7 @@ class Message():
     """Message class."""
 
     def __init__(self, value, from_id, to_id, round_, type_, marker=False):
-        """Init."""
+        """Initialize each message based on the parameters passed."""
         self.value = value
         self.marker = marker
         self.from_id = from_id
@@ -162,12 +175,17 @@ if __name__ == '__main__':
     if len(sys.argv) > 1:
         num_process = int(sys.argv[1])
         try:
-            verbose = bool(sys.argv[2])
+            operator = '>' if sys.argv[2] == "dsc" else '<'
+        except IndexError:
+            operator = '<'
+        try:
+            verbose = bool(sys.argv[3])
         except IndexError:
             pass
     else:
-        print("Usage: python plain_dist_sort.py <num_process> [verbose]\n" +
+        print("Usage: python <filename>.py <num_process> <order> [verbose]\n" +
               "num_process : Number of processes to simulate.\n" +
+              "order: 'asc' will return ascending order of elements and 'dsc' will return descending order of elements.\n" +
               "verbose : True/False to print the log of the Simulator\n")
         sys.exit(0)
 
@@ -177,11 +195,11 @@ if __name__ == '__main__':
     connections = [Pipe(duplex=True) for i in range(num_process-1)]
 
     # Created processes in a line network
-    left_process = SimProcess(0, None, connections[0][0], init_flag=True)
+    left_process = SimProcess(0, operator, None, connections[0][0], init_flag=True)
     processes.append(left_process)
-    processes.extend([SimProcess(i, connections[i-1][1], connections[i][0])
+    processes.extend([SimProcess(i, operator, connections[i-1][1], connections[i][0])
                       for i in range(1, num_process - 1)])
-    right_process = SimProcess(num_process-1, connections[num_process-2][1], None)
+    right_process = SimProcess(num_process-1, operator, connections[num_process-2][1], None)
     processes.append(right_process)
 
     # Start all processes.
