@@ -1,0 +1,25 @@
+Armentières	49.952647
+Austin	49.982385
+Bengaluru	49.960589
+Bergerac	49.925321
+Cerignola	49.962496
+Dieppe	49.946699
+Indore	49.989369
+Jaipur	49.973222
+Khammam	49.972235
+La Spezia	49.935718
+Lakshmeshwar	49.96016
+Latur	49.930385
+Naila Janjgir	49.969197
+Rau	49.918282
+Rehli	49.960607
+Saint-Ouen	49.995556
+San Jose	49.959977
+Sandnes	49.964133
+Sannois	49.97301
+Suri	49.97167
+Sète	49.936417
+Tohana	49.944695
+Udaipur	49.969609
+Udhagamandalam	49.962913
+Yemmiganur	49.97446

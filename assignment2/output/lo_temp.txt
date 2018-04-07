@@ -1,0 +1,25 @@
+Armentières	3e-06
+Austin	1.7e-05
+Bengaluru	1.5e-05
+Bergerac	0.0
+Cerignola	4e-06
+Dieppe	7e-06
+Indore	1.8e-05
+Jaipur	2.4e-05
+Khammam	3.8e-05
+La Spezia	5e-06
+Lakshmeshwar	1.9e-05
+Latur	4e-06
+Naila Janjgir	2e-06
+Rau	4e-06
+Rehli	3e-06
+Saint-Ouen	1.9e-05
+San Jose	1.3e-05
+Sandnes	0.0
+Sannois	0.0
+Suri	1.1e-05
+Sète	8e-06
+Tohana	5e-06
+Udaipur	1e-05
+Udhagamandalam	5.1e-05
+Yemmiganur	5e-06

@@ -1,0 +1,8 @@
+hottest day per city
+highest temperature in every city
+lowest temperature in every city
+average hi in every city
+average lo in every city
+hottest city
+coldest city
+HADOOP_CLIENT_OPTS="-Xmx4g" bin/hadoop jar share/hadoop/tools/lib/hadoop-streaming-2.9.0.jar -mapper code/mapper.py -reducer code/reducer.py -input input/* -output output -file code/mapper.py -file code/reducer.py
