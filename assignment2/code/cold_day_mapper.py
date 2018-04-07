@@ -10,4 +10,4 @@ for line in sys.stdin:
 
     city, date, hi, lo = line.split(',')
 
-    print('{}\t{}\t1'.format(city, hi))
+    print('{}\t{}\t{}'.format(city, date, lo))
