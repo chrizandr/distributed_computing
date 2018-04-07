@@ -1,3 +1,5 @@
+The code consists is used to process weather data generated using GenerateDATA.java. The file was used to create a data file of 40M weather entries amounting to 1.5Gb of data. The large file was split into multiple smaller ones using the `split` command. The splitted files were then used for processing.
+
 ### The following information is extracted from the weather information generated.
 
 - The hottest day per city [Files: `hot_day_mapper.py` and `hot_day_reducer.py`]
