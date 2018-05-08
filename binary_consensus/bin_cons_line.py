@@ -1,5 +1,6 @@
 """Odd Even transposition sorting implementation."""
 import multiprocessing
+import math
 from multiprocessing import Pipe
 from random import randint
 import sys
@@ -57,6 +58,7 @@ def assign_state(my_state, other_state):
     elif my_state == e_1 and other_state == 0:
         other_new = e_1
         my_new = e_0
+
     return my_new, other_new
 
 
@@ -82,14 +84,14 @@ class SimProcess(multiprocessing.Process):
 
     def action_message(self, message):
         """Handle Action type messages. Receiver does local computation on receiving data."""
-        if self.compare(self.value, message.value) and message.from_id < self.id_:
-            new_message = Message(self.value, self.id_, message.from_id, self.round, "Reply")
-            self.value = message.value
-            print("-> <- Swapping between P{} and P{}\n".format(self.id_, message.from_id) if verbose else "", end='')
+        my_new, other_new = assign_state(self.state, message.value)
+        if message.from_id < self.id_:
+            new_message = Message(other_new, self.id_, message.from_id, self.round, "Reply")
+            self.l_connection.send(new_message)
+            self.state = my_new
         else:
-            new_message = Message(message.value, self.id_, message.from_id, self.round, "Reply")
-
-        self.l_connection.send(new_message)
+            print("Abort, Wrong message received")
+            sys.exit(0)
 
     def service_message(self, message):
         """Handle Service type messages. These messages are to calculate the value of alpha."""
@@ -169,24 +171,24 @@ class SimProcess(multiprocessing.Process):
         """Calls appropriate actions during the whole process of sorting."""
         print("P{} Value = {}".format(self.id_, self.state))
         self.find_alpha()
-        print("P{} Alpha value = {}\n".format(self.id_, max(self.alpha)/sum(self.alpha)))
-
+        print("P{} Alpha value = {}".format(self.id_, max(self.alpha)/sum(self.alpha)))
+        alpha = max(self.alpha)/sum(self.alpha)
         next_ = self.id_ + 1 if self.id_ < self.num_process-1 else -1
-        time_p1 = int(4 * (16 * ((1-self.alpha)**2) * (self.num_process**2) * math.log(self.num_process)) / (math.pi ** 2))
-        time_p2 = int(4 * (16 * ((1-self.alpha)**2) * (self.num_process**2) * math.log(self.num_process)) / (math.pi ** 2))
-        for i in range(0, self.num_process):
+        time_p = int(2 * (16 * ((1-alpha)**2) * (self.num_process**2) * math.log(self.num_process)) / (math.pi ** 2))
+        for i in range(0, time_p):
             self.round = i
             print("** P{}: Current Value={} Current round={}\n".format(self.id_, self.value, self.round) if verbose else "", end='')
-            if self.id_ % 2 == i % 2:
-                if next_ != -1:
-                    self.r_connection.send(Message(self.value, self.id_, next_,
-                                           i, "Action"))
-                    print(" .. P{} sent message to right process P{}\n".format(self.id_, next_) if verbose else "", end='')
-                    self.receive("R")
-            else:
+            if next_ != -1:
+                self.r_connection.send(Message(self.state, self.id_, next_,
+                                       i, "Action"))
+                print(" .. P{} sent message to right process P{}\n".format(self.id_, next_) if verbose else "", end='')
+            if self.id_ != 0:
                 self.receive("L")
+            if next_ != -1:
+                self.receive("R")
+            # print(self.state)
 
-        print("P{} Value = {}".format(self.id_, self.alpha))
+        self.print_state()
 
 
 class Message():
