@@ -4,10 +4,11 @@ import math
 from multiprocessing import Pipe
 from random import randint
 import sys
+import pdb
 
 legend = ("{}LOG LEGEND{}\n".format('-'*5, '-'*5) +
-          "-> <-\tSwapping values record\n" +
-          ">>\tControl message record\n" +
+          "[#]\tIntermediate state\n" +
+          ">>\tFinal Result\n" +
           "..\t Communication record\n" +
           "**\t Snapshot of variables\n" +
           "{}----------{}\n".format('-'*5, '-'*5))
@@ -157,27 +158,32 @@ class SimProcess(multiprocessing.Process):
             self.receive("L")
             self.receive("R")
 
-    def print_state(self):
+    def print_state(self, rounds=None):
+        "Print the state of the process."
+        if rounds:
+            print(" >> P{} state after {} round: {}".format(self.id_, rounds, int(self.alpha[0] <= self.alpha[1])))
+            return None
         if self.state == 0:
-            print("P{} in state: 0".format(self.id_))
+            print(" [#] P{} in state: 0".format(self.id_))
         elif self.state == e_0:
-            print("P{} in state: e_0".format(self.id_))
+            print(" [#] P{} in state: e_0".format(self.id_))
         elif self.state == e_1:
-            print("P{} in state: e_1".format(self.id_))
+            print(" [#] P{} in state: e_1".format(self.id_))
         elif self.state == 1:
-            print("P{} in state: 1".format(self.id_))
+            print(" [#] P{} in state: 1".format(self.id_))
 
     def run(self):
         """Calls appropriate actions during the whole process of sorting."""
-        print("P{} Value = {}".format(self.id_, self.state))
+        print(" [...] P{} Value = {}".format(self.id_, self.state))
         self.find_alpha()
-        print("P{} Alpha value = {}".format(self.id_, max(self.alpha)/sum(self.alpha)))
         alpha = max(self.alpha)/sum(self.alpha)
         next_ = self.id_ + 1 if self.id_ < self.num_process-1 else -1
         time_p = int(2 * (16 * ((1-alpha)**2) * (self.num_process**2) * math.log(self.num_process)) / (math.pi ** 2))
+        i=0
         for i in range(0, time_p):
             self.round = i
-            print("** P{}: Current Value={} Current round={}\n".format(self.id_, self.value, self.round) if verbose else "", end='')
+            if verbose:
+                self.print_state()
             if next_ != -1:
                 self.r_connection.send(Message(self.state, self.id_, next_,
                                        i, "Action"))
@@ -187,8 +193,7 @@ class SimProcess(multiprocessing.Process):
             if next_ != -1:
                 self.receive("R")
             # print(self.state)
-
-        self.print_state()
+        self.print_state(i)
 
 
 class Message():
@@ -208,7 +213,7 @@ if __name__ == '__main__':
     if len(sys.argv) > 1:
         num_process = int(sys.argv[1])
         try:
-            verbose = bool(sys.argv[3])
+            verbose = bool(sys.argv[2])
         except IndexError:
             pass
     else:
