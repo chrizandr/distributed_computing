@@ -1,4 +1,4 @@
-"""Odd Even transposition sorting implementation."""
+"""Distributed Binary consensus algorithm."""
 import multiprocessing
 import math
 from multiprocessing import Pipe
@@ -133,7 +133,10 @@ class SimProcess(multiprocessing.Process):
 
     def receive(self, flag):
         """Process waits for messages from the sender."""
-        assert flag in ["L", "R"]
+        try:
+            assert flag in ["L", "R"]
+        except AssertionError:
+            self.state = int(self.alpha[0] <= self.alpha[1])
         message = None
         if flag is "L":
             if self.l_connection is not None:
@@ -161,7 +164,8 @@ class SimProcess(multiprocessing.Process):
     def print_state(self, rounds=None):
         "Print the state of the process."
         if rounds:
-            print(" >> P{} state after {} round: {}".format(self.id_, rounds, int(self.alpha[0] <= self.alpha[1])))
+            self.receive("l")
+            print(" >> P{} state after {} round: {}".format(self.id_, rounds, self.state))
             return None
         if self.state == 0:
             print(" [#] P{} in state: 0".format(self.id_))
@@ -219,7 +223,6 @@ if __name__ == '__main__':
     else:
         print("Usage: python <filename>.py <num_process> <order> [verbose]\n" +
               "num_process : Number of processes to simulate.\n" +
-              "order: 'asc' will return ascending order of elements and 'dsc' will return descending order of elements.\n" +
               "verbose : True/False to print the log of the Simulator\n")
         sys.exit(0)
 
