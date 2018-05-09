@@ -149,7 +149,7 @@ class SimProcess(multiprocessing.Process):
                 self.handle(message)
 
     def find_alpha(self):
-        """Initiate counting of processes."""
+        """Initiate finding alpha value."""
         if self.init_flag:
             self.alpha[self.state] += 1
             self.r_connection.send(Message(self.alpha, self.id_, self.id_+1, -1, "Service"))
@@ -173,7 +173,7 @@ class SimProcess(multiprocessing.Process):
             print(" [#] P{} in state: 1".format(self.id_))
 
     def run(self):
-        """Calls appropriate actions during the whole process of sorting."""
+        """Calls appropriate actions during the whole process of consensus."""
         print(" [...] P{} Value = {}".format(self.id_, self.state))
         self.find_alpha()
         alpha = max(self.alpha)/sum(self.alpha)
