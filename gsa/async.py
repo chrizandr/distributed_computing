@@ -181,7 +181,7 @@ if __name__ == '__main__':
     # Create self connections for processes
     for i in range(num_process):
         incoming_connections[i][i], outgoing_connections[i][i] = Pipe(duplex=True)
-    pdb.set_trace()
+    # pdb.set_trace()
     # Created processes in a network
     for i in range(num_process):
         processes.append(SimProcess(i, outgoing_connections[i], [incoming_connections[j][i] for j in range(num_process)]))
